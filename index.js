@@ -25,6 +25,7 @@ async function run() {
   try {
     const database = client.db("craftFlowDB");
     const usersCollection = database.collection("users");
+    const tasksCollection = database.collection("work-sheet");
 
     // ----------------------users API----------------------
     app.post("/users", async (req, res) => {
@@ -45,7 +46,7 @@ async function run() {
 
         if (email) {
           const user = await usersCollection.findOne({ email });
-          return res.send(user || {});
+          return res.status(200).send(user || {});
         }
 
         const users = await usersCollection.find().toArray();
@@ -53,6 +54,35 @@ async function run() {
       } catch (error) {
         console.error("Failed to fetch users:", error.message);
         res.status(500).json({ error: "Failed to retrieve users" });
+      }
+    });
+
+    // ----------------------tasks API----------------------
+    app.post("/work-sheet", async (req, res) => {
+      try {
+        const task = req.body;
+        task.hours = parseInt(task.hours);
+        const result = await tasksCollection.insertOne(task);
+        res.status(201).send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to add task" });
+      }
+    });
+
+    app.get("/work-sheet", async (req, res) => {
+      try {
+        const email = req.query.email;
+
+        const query = email ? { created_by: email } : {};
+        const task = await tasksCollection
+          .find(query)
+          .sort({ date: -1 })
+          .toArray();
+
+        res.status(200).send(task || {});
+      } catch (error) {
+        console.error("Failed to fetch tasks:", error);
+        res.status(500).send({ error: "Failed to fetch tasks" });
       }
     });
 

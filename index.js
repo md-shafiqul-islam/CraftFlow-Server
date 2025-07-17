@@ -52,7 +52,6 @@ async function run() {
         const users = await usersCollection.find().toArray();
         res.status(200).send(users);
       } catch (error) {
-        console.error("Failed to fetch users:", error.message);
         res.status(500).send({ error: "Failed to retrieve users" });
       }
     });
@@ -81,7 +80,6 @@ async function run() {
 
         res.status(200).send(task || {});
       } catch (error) {
-        console.error("Failed to fetch tasks:", error);
         res.status(500).send({ error: "Failed to fetch tasks" });
       }
     });
@@ -94,8 +92,23 @@ async function run() {
         });
         res.send(result);
       } catch (error) {
-        console.error("Failed to delete task:", error.message);
         res.status(500).send({ error: "Failed to delete task" });
+      }
+    });
+
+    app.put("/work-sheet/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+        updatedData.hours = parseInt(updatedData.hours);
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: updatedData };
+
+        const result = await tasksCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to update task" });
       }
     });
 

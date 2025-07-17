@@ -42,17 +42,41 @@ async function run() {
 
     app.get("/users", async (req, res) => {
       try {
-        const email = req.query.email;
+        const { email, role } = req.query;
 
+        const query = {};
         if (email) {
+          query.email = email;
+        }
+
+        if (role) {
+          query.role = role;
+        }
+
+        if (email && !role) {
           const user = await usersCollection.findOne({ email });
           return res.status(200).send(user || {});
         }
 
-        const users = await usersCollection.find().toArray();
-        res.status(200).send(users);
+        const users = await usersCollection.find(query).toArray();
+        res.status(200).send(users || []);
       } catch (error) {
         res.status(500).send({ error: "Failed to retrieve users" });
+      }
+    });
+
+    app.patch("/users/:id/toggle-verified", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const user = await usersCollection.findOne(filter);
+
+        const updatedDoc = { $set: { isVerified: !user.isVerified } };
+        const updated = await usersCollection.updateOne(filter, updatedDoc);
+
+        res.send(updated);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to toggle verified status" });
       }
     });
 

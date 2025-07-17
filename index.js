@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 dotenv.config();
 
@@ -36,7 +36,7 @@ async function run() {
         res.status(201).send(result);
       } catch (error) {
         console.error("Failed to insert user:", error.message);
-        res.status(500).json({ error: "Failed to add user" });
+        res.status(500).send({ error: "Failed to add user" });
       }
     });
 
@@ -53,7 +53,7 @@ async function run() {
         res.status(200).send(users);
       } catch (error) {
         console.error("Failed to fetch users:", error.message);
-        res.status(500).json({ error: "Failed to retrieve users" });
+        res.status(500).send({ error: "Failed to retrieve users" });
       }
     });
 
@@ -83,6 +83,19 @@ async function run() {
       } catch (error) {
         console.error("Failed to fetch tasks:", error);
         res.status(500).send({ error: "Failed to fetch tasks" });
+      }
+    });
+
+    app.delete("/work-sheet/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await tasksCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (error) {
+        console.error("Failed to delete task:", error.message);
+        res.status(500).send({ error: "Failed to delete task" });
       }
     });
 

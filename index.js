@@ -26,6 +26,7 @@ async function run() {
     const database = client.db("craftFlowDB");
     const usersCollection = database.collection("users");
     const tasksCollection = database.collection("work-sheet");
+    const paymentsCollection = database.collection("payments");
 
     // ----------------------users API----------------------
     app.post("/users", async (req, res) => {
@@ -65,7 +66,7 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id/toggle-verified", async (req, res) => {
+    app.patch("/users/:id/update-verification", async (req, res) => {
       try {
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
@@ -76,7 +77,7 @@ async function run() {
 
         res.send(updated);
       } catch (error) {
-        res.status(500).send({ error: "Failed to toggle verified status" });
+        res.status(500).send({ error: "Failed to update verified status" });
       }
     });
 
@@ -133,6 +134,31 @@ async function run() {
         res.send(result);
       } catch (error) {
         res.status(500).send({ error: "Failed to update task" });
+      }
+    });
+
+    // ----------------------payments API----------------------
+    app.post("/payment", async (req, res) => {
+      try {
+        const paymentData = req.body;
+        const { employeeId, month, year } = paymentData;
+
+        const isExists = await paymentsCollection.findOne({
+          employeeId,
+          month,
+          year,
+        });
+
+        if (isExists) {
+          return res
+            .status(400)
+            .send({ message: "Already requested for this month." });
+        }
+
+        const result = await paymentsCollection.insertOne(paymentData);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Failed to create payment request." });
       }
     });
 

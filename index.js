@@ -33,8 +33,28 @@ async function run() {
     app.post("/users", async (req, res) => {
       try {
         const userInfo = req.body;
-        userInfo.salary = parseInt(userInfo.salary);
-        const result = await usersCollection.insertOne(userInfo);
+        const email = userInfo.email?.toLowerCase();
+
+        const existingUser = await usersCollection.findOne({ email });
+        if (existingUser) {
+          return res
+            .status(409)
+            .send({ message: "User with this email already exists" });
+        }
+
+        const userPayload = {
+          ...userInfo,
+          email,
+          salary: parseInt(userInfo.salary),
+        };
+
+        if (email === "admin@gmail.com") {
+          userPayload.role = "Admin";
+          userPayload.designation = "Admin";
+          userPayload.isVerified = true;
+        }
+
+        const result = await usersCollection.insertOne(userPayload);
         res.status(201).send(result);
       } catch (error) {
         console.error("Failed to insert user:", error.message);
@@ -161,6 +181,28 @@ async function run() {
         const paymentData = req.body;
         const { employeeId, month, year } = paymentData;
 
+        // Validate year is a 4-digit number between 1900–2099
+        if (!/^\d{4}$/.test(year) || year < 1900 || year > 2099) {
+          return res.status(400).send({
+            message:
+              "Invalid year. Please enter a 4-digit year between 1900–2099.",
+          });
+        }
+
+        // Convert month to number (if it’s a string like "July")
+        const monthNumber = isNaN(month)
+          ? new Date(`${month} 1, ${year}`).getMonth() + 1
+          : parseInt(month);
+
+        if (isNaN(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+          return res
+            .status(400)
+            .send({ message: "Invalid month. Please provide a valid month." });
+        }
+
+        paymentData.month = monthNumber;
+        paymentData.year = parseInt(year);
+
         const isExists = await paymentsCollection.findOne({
           employeeId,
           month,
@@ -177,6 +219,28 @@ async function run() {
         res.send(result);
       } catch (error) {
         res.status(500).send({ message: "Failed to create payment request." });
+      }
+    });
+
+    app.get("/payments", async (req, res) => {
+      try {
+        const { email, page = 1, limit = 5 } = req.query;
+
+        const query = { email };
+        const options = {
+          sort: { year: -1, month: -1 }, // earliest year/month first
+          skip: (parseInt(page) - 1) * parseInt(limit),
+          limit: parseInt(limit),
+        };
+
+        const payments = await paymentsCollection
+          .find(query, options)
+          .toArray();
+        const total = await paymentsCollection.countDocuments(query);
+
+        res.send({ payments, total });
+      } catch (error) {
+        res.status(500).send({ message: "Failed to fetch payments" });
       }
     });
 

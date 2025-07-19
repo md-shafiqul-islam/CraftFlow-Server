@@ -4,6 +4,7 @@ const dotenv = require("dotenv");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 dotenv.config();
+const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY);
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -137,6 +138,23 @@ async function run() {
       }
     });
 
+    // ----------------------payment intent API----------------------
+    app.post("/create-payment-intent", async (req, res) => {
+      try {
+        const { amount } = req.body;
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
     // ----------------------payments API----------------------
     app.post("/payment", async (req, res) => {
       try {
@@ -150,9 +168,9 @@ async function run() {
         });
 
         if (isExists) {
-          return res
-            .status(400)
-            .send({ message: "Already requested for this month." });
+          return res.status(400).send({
+            message: "Payment request for this month already exists.",
+          });
         }
 
         const result = await paymentsCollection.insertOne(paymentData);

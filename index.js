@@ -87,6 +87,34 @@ async function run() {
       }
     });
 
+    app.get("/user-details/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const employee = await usersCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        const salaryHistory = await paymentsCollection
+          .find({ email: employee.email })
+          .sort({ year: 1, month: 1 })
+          .toArray();
+
+        res.send({
+          name: employee.name,
+          photo: employee.photo,
+          designation: employee.designation,
+          salaryHistory: salaryHistory.map(({ month, year, salary }) => ({
+            month,
+            year,
+            salary,
+          })),
+        });
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch employee details" });
+      }
+    });
+
     app.patch("/users/:id/update-verification", async (req, res) => {
       try {
         const id = req.params.id;

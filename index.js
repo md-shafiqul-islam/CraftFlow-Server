@@ -29,7 +29,7 @@ async function run() {
     const tasksCollection = database.collection("work-sheet");
     const paymentsCollection = database.collection("payments");
 
-    // ----------------------check user status----------------------
+    /** ----------------------check user status----------------------**/
     app.post("/login-check", async (req, res) => {
       try {
         const { email } = req.body;
@@ -49,7 +49,7 @@ async function run() {
       }
     });
 
-    // ----------------------users API----------------------
+    /** ----------------------users api----------------------**/
     app.post("/users", async (req, res) => {
       try {
         const userInfo = req.body;
@@ -84,14 +84,20 @@ async function run() {
 
     app.get("/users", async (req, res) => {
       try {
-        const { email, role, isVerified } = req.query;
+        const { email, role, isVerified, excludeAdmin } = req.query;
 
         const query = {};
         if (email) {
           query.email = email;
         }
 
-        if (role) {
+        if (excludeAdmin === "true") {
+          if (!role) {
+            query.role = { $ne: "Admin" };
+          } else {
+            query.role = role;
+          }
+        } else if (role) {
           query.role = role;
         }
 
@@ -111,7 +117,7 @@ async function run() {
       }
     });
 
-    app.get("/user-details/:id", async (req, res) => {
+    app.get("/users/:id/details", async (req, res) => {
       try {
         const { id } = req.params;
 
@@ -154,19 +160,34 @@ async function run() {
       }
     });
 
-    app.patch("/user/:id", async (req, res) => {
-      const { id } = req.params;
-      const filter = { _id: new ObjectId(id) };
-      const updateStatus = { $set: { status: "fired" } };
+    app.patch("/users/:id/fire", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const filter = { _id: new ObjectId(id) };
+        const updateStatus = { $set: { status: "fired", role: "HR" } };
 
-      const currentStatus = await usersCollection.updateOne(
-        filter,
-        updateStatus
-      );
-      res.send(currentStatus);
+        const updated = await usersCollection.updateOne(filter, updateStatus);
+
+        res.send(updated);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fire the user" });
+      }
     });
 
-    // ----------------------tasks API----------------------
+    app.patch("/users/:id/make-hr", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const filter = { _id: new ObjectId(id) };
+        const updateRole = { $set: { role: "HR" } };
+
+        const updated = await usersCollection.updateOne(filter, updateRole);
+        res.send(updated);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to update role" });
+      }
+    });
+
+    /** ----------------------tasks api----------------------**/
     app.post("/work-sheet", async (req, res) => {
       try {
         const task = req.body;
@@ -194,18 +215,6 @@ async function run() {
       }
     });
 
-    app.delete("/work-sheet/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const result = await tasksCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        res.send(result);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to delete task" });
-      }
-    });
-
     app.put("/work-sheet/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -222,7 +231,19 @@ async function run() {
       }
     });
 
-    // ----------------------payment intent API----------------------
+    app.delete("/work-sheet/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const result = await tasksCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to delete task" });
+      }
+    });
+
+    /** ----------------------payment intent api----------------------**/
     app.post("/create-payment-intent", async (req, res) => {
       try {
         const { amount } = req.body;
@@ -239,7 +260,7 @@ async function run() {
       }
     });
 
-    // ----------------------payments API----------------------
+    /** ----------------------payments api----------------------**/
     app.post("/payment", async (req, res) => {
       try {
         const paymentData = req.body;

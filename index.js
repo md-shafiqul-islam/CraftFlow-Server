@@ -29,6 +29,26 @@ async function run() {
     const tasksCollection = database.collection("work-sheet");
     const paymentsCollection = database.collection("payments");
 
+    // ----------------------check user status----------------------
+    app.post("/login-check", async (req, res) => {
+      try {
+        const { email } = req.body;
+
+        const user = await usersCollection.findOne({
+          email: email.toLowerCase(),
+        });
+        if (user.status === "fired") {
+          return res.status(403).send({
+            message: "Your account has been disabled. Please contact admin.",
+          });
+        }
+
+        res.send({ message: "User is active" });
+      } catch (error) {
+        res.status(500).send({ message: "Server error" });
+      }
+    });
+
     // ----------------------users API----------------------
     app.post("/users", async (req, res) => {
       try {
@@ -64,7 +84,7 @@ async function run() {
 
     app.get("/users", async (req, res) => {
       try {
-        const { email, role } = req.query;
+        const { email, role, isVerified } = req.query;
 
         const query = {};
         if (email) {
@@ -75,7 +95,11 @@ async function run() {
           query.role = role;
         }
 
-        if (email && !role) {
+        if (isVerified !== undefined) {
+          query.isVerified = JSON.parse(isVerified);
+        }
+
+        if (email && !role && isVerified === undefined) {
           const user = await usersCollection.findOne({ email });
           return res.status(200).send(user || {});
         }
@@ -128,6 +152,18 @@ async function run() {
       } catch (error) {
         res.status(500).send({ error: "Failed to update verified status" });
       }
+    });
+
+    app.patch("/user/:id", async (req, res) => {
+      const { id } = req.params;
+      const filter = { _id: new ObjectId(id) };
+      const updateStatus = { $set: { status: "fired" } };
+
+      const currentStatus = await usersCollection.updateOne(
+        filter,
+        updateStatus
+      );
+      res.send(currentStatus);
     });
 
     // ----------------------tasks API----------------------
@@ -255,17 +291,17 @@ async function run() {
         const { email, page = 1, limit = 5 } = req.query;
 
         const query = { email };
-        const options = {
-          sort: { year: -1, month: -1 }, // earliest year/month first
-          skip: (parseInt(page) - 1) * parseInt(limit),
-          limit: parseInt(limit),
-        };
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const limitNum = parseInt(limit);
 
         const payments = await paymentsCollection
-          .find(query, options)
+          .find(query)
+          .sort({ year: -1, month: -1 })
+          .skip(skip)
+          .limit(limitNum)
           .toArray();
-        const total = await paymentsCollection.countDocuments(query);
 
+        const total = await paymentsCollection.countDocuments(query);
         res.send({ payments, total });
       } catch (error) {
         res.status(500).send({ message: "Failed to fetch payments" });

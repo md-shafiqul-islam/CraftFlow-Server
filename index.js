@@ -183,9 +183,14 @@ async function run() {
           .toArray();
 
         users.sort((a, b) => {
+          if (a.status !== b.status) {
+            return a.status === "active" ? -1 : 1;
+          }
+
           if (a.role === b.role) return 0;
           if (a.role === "HR") return -1;
           if (b.role === "HR") return 1;
+
           return 0;
         });
 
@@ -296,6 +301,32 @@ async function run() {
     );
 
     app.patch(
+      "/users/:id/update-salary",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const { newSalary } = req.body;
+          console.log(typeof newSalary);
+
+          const updateResult = await usersCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { salary: newSalary } }
+          );
+
+          if (updateResult.modifiedCount === 0) {
+            return res.status(500).send("Failed to update salary.");
+          }
+
+          res.send("Salary updated successfully.");
+        } catch (err) {
+          res.status(500).send("Internal Server Error");
+        }
+      }
+    );
+
+    app.patch(
       "/users/:id/fire",
       verifyFBToken,
       verifyAdmin,
@@ -303,7 +334,7 @@ async function run() {
         try {
           const { id } = req.params;
           const filter = { _id: new ObjectId(id) };
-          const updateStatus = { $set: { status: "fired", role: "HR" } };
+          const updateStatus = { $set: { status: "fired" } };
 
           const updated = await usersCollection.updateOne(filter, updateStatus);
 

@@ -117,6 +117,16 @@ async function run() {
       }
     });
 
+    app.get("/users/role", async (req, res) => {
+      try {
+        const { email } = req.query;
+        const user = await usersCollection.findOne({ email });
+        res.status(200).send({ role: user?.role || "Employee" });
+      } catch (error) {
+        res.status(500).send({ error: "Failed to get role" });
+      }
+    });
+
     app.get("/users/:id/details", async (req, res) => {
       try {
         const { id } = req.params;

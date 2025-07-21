@@ -270,10 +270,22 @@ async function run() {
           .toArray();
 
         users.sort((a, b) => {
-          if (a.role === b.role) return 0;
-          if (a.role === "HR") return -1;
-          if (b.role === "HR") return 1;
-          return 0;
+          // First sort by status: active first, fired last
+          if (a.status === b.status) {
+            // If status is same, sort by role: HR first, Employee later
+            if (a.role === b.role) return 0;
+            if (a.role === "HR") return -1;
+            if (b.role === "HR") return 1;
+            return 0;
+          }
+
+          if (a.status === "active") return -1;
+          if (b.status === "active") return 1;
+
+          if (a.status === "fired") return 1;
+          if (b.status === "fired") return -1;
+
+          return 0; // fallback
         });
 
         res.status(200).send(users || []);
@@ -472,8 +484,8 @@ async function run() {
 
         const isExists = await paymentsCollection.findOne({
           employeeId,
-          month,
-          year,
+          month: monthNumber,
+          year: parseInt(year),
         });
 
         if (isExists) {
@@ -510,6 +522,110 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch payments" });
       }
     });
+
+    app.get(
+      "/payments/pending",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const payments = await paymentsCollection
+            .aggregate([
+              {
+                $lookup: {
+                  from: "users",
+                  let: { employeeId: "$employeeId" },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: {
+                          $and: [
+                            { $eq: ["$_id", { $toObjectId: "$$employeeId" }] },
+                            { $ne: ["$status", "fired"] },
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                  as: "user",
+                },
+              },
+              {
+                $match: {
+                  paymentStatus: "pending",
+                  user: { $ne: [] },
+                },
+              },
+              {
+                $sort: { year: -1, month: -1 },
+              },
+              {
+                $project: { user: 0 },
+              },
+            ])
+            .toArray();
+
+          res.send(payments);
+        } catch (error) {
+          res.status(500).send({ message: "Failed to fetch pending payments" });
+        }
+      }
+    );
+
+    app.patch(
+      "/payments/salary",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const { id } = req.body;
+
+          const existing = await paymentsCollection.findOne({
+            _id: new ObjectId(id),
+          });
+
+          if (!existing) {
+            return res
+              .status(404)
+              .send({ message: "Payment request not found" });
+          }
+
+          if (existing.paymentDate) {
+            return res.status(400).send({ message: "Salary already paid." });
+          }
+
+          // Prevent duplicate payment for same employee/month/year
+          const duplicate = await paymentsCollection.findOne({
+            employeeId: existing.employeeId,
+            month: existing.month,
+            year: existing.year,
+            paymentDate: { $exists: true },
+          });
+
+          if (duplicate) {
+            return res.status(400).send({
+              message: "Salary already paid for this month and year.",
+            });
+          }
+
+          const paymentDate = new Date().toISOString();
+
+          const result = await paymentsCollection.updateOne(
+            { _id: new ObjectId(id) },
+            {
+              $set: {
+                status: "completed",
+                paymentDate,
+              },
+            }
+          );
+
+          res.send({ success: true, paymentDate });
+        } catch (err) {
+          res.status(500).send({ message: "Payment failed" });
+        }
+      }
+    );
 
     console.log("You successfully connected to MongoDB!");
   } finally {

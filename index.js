@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const admin = require("firebase-admin");
 
 dotenv.config();
 const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY);
@@ -12,6 +13,11 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+const serviceAccount = require("./service-account-credentials.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(process.env.MONGODB_URI, {
@@ -28,6 +34,46 @@ async function run() {
     const usersCollection = database.collection("users");
     const tasksCollection = database.collection("work-sheet");
     const paymentsCollection = database.collection("payments");
+
+    // Middleware to verify Firebase ID Token
+    const verifyFBToken = async (req, res, next) => {
+      const authHeaders = req.headers.authorization;
+      if (!authHeaders || !authHeaders.startsWith("Bearer")) {
+        return res
+          .status(401)
+          .send({ message: "Unauthorized access: Token missing or malformed" });
+      }
+
+      const token = authHeaders.split(" ")[1];
+      if (!token) {
+        return res
+          .status(401)
+          .send({ message: "Unauthorized access: Token missing" });
+      }
+
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        req.decodedToken = decodedToken;
+        next();
+      } catch (error) {
+        return res
+          .status(403)
+          .send({ message: "Forbidden access: Invalid token" });
+      }
+    };
+
+    // Middleware to verify Admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decodedToken.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user.role !== "Admin") {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+
+      next();
+    };
 
     /** ----------------------check user status----------------------**/
     app.post("/login-check", async (req, res) => {
@@ -82,48 +128,59 @@ async function run() {
       }
     });
 
-    app.get("/users", async (req, res) => {
+    app.get("/users/me", async (req, res) => {
       try {
-        const { email, role, isVerified, excludeAdmin } = req.query;
-
-        const query = {};
-        if (email) {
-          query.email = email;
-        }
-
-        if (excludeAdmin === "true") {
-          if (!role) {
-            query.role = { $ne: "Admin" };
-          } else {
-            query.role = role;
-          }
-        } else if (role) {
-          query.role = role;
-        }
-
-        if (isVerified !== undefined) {
-          query.isVerified = JSON.parse(isVerified);
-        }
-
-        if (email && !role && isVerified === undefined) {
-          const user = await usersCollection.findOne({ email });
-          return res.status(200).send(user || {});
-        }
-
-        const users = await usersCollection.find(query).toArray();
-        res.status(200).send(users || []);
+        const { email } = req.query;
+        const user = await usersCollection.findOne({ email });
+        res.send(user || {});
       } catch (error) {
-        res.status(500).send({ error: "Failed to retrieve users" });
+        res.status(500).send({ message: "Server error" });
       }
     });
 
-    app.get("/users/role", async (req, res) => {
+    app.get("/users/role", verifyFBToken, async (req, res) => {
       try {
         const { email } = req.query;
         const user = await usersCollection.findOne({ email });
         res.status(200).send({ role: user?.role || "Employee" });
       } catch (error) {
         res.status(500).send({ error: "Failed to get role" });
+      }
+    });
+
+    app.get("/users/employees", async (req, res) => {
+      try {
+        const users = await usersCollection
+          .find({
+            role: { $in: ["HR", "Employee"] },
+          })
+          .toArray();
+
+        users.sort((a, b) => {
+          if (a.role === b.role) return 0;
+          if (a.role === "HR") return -1;
+          if (b.role === "HR") return 1;
+          return 0;
+        });
+
+        res.status(200).send(users || []);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to retrieve employee list" });
+      }
+    });
+
+    app.patch("/users/:id/update-verification", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const user = await usersCollection.findOne(filter);
+
+        const updatedDoc = { $set: { isVerified: !user.isVerified } };
+        const updated = await usersCollection.updateOne(filter, updatedDoc);
+
+        res.send(updated);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to update verified status" });
       }
     });
 
@@ -155,18 +212,25 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id/update-verification", async (req, res) => {
+    app.get("/users/verified", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const user = await usersCollection.findOne(filter);
+        const users = await usersCollection
+          .find({
+            isVerified: true,
+            role: { $in: ["HR", "Employee"] },
+          })
+          .toArray();
 
-        const updatedDoc = { $set: { isVerified: !user.isVerified } };
-        const updated = await usersCollection.updateOne(filter, updatedDoc);
+        users.sort((a, b) => {
+          if (a.role === b.role) return 0;
+          if (a.role === "HR") return -1;
+          if (b.role === "HR") return 1;
+          return 0;
+        });
 
-        res.send(updated);
+        res.status(200).send(users || []);
       } catch (error) {
-        res.status(500).send({ error: "Failed to update verified status" });
+        res.status(500).send({ error: "Failed to retrieve verified users" });
       }
     });
 

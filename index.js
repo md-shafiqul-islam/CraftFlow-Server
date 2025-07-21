@@ -62,6 +62,32 @@ async function run() {
       }
     };
 
+    // Middleware to verify Employee
+    const verifyEmployee = async (req, res, next) => {
+      const email = req.decodedToken.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user?.role !== "Employee") {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+
+      next();
+    };
+
+    // Middleware to verify HR
+    const verifyHR = async (req, res, next) => {
+      const email = req.decodedToken.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user?.role !== "HR") {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+
+      next();
+    };
+
     // Middleware to verify Admin
     const verifyAdmin = async (req, res, next) => {
       const email = req.decodedToken.email;
@@ -128,7 +154,7 @@ async function run() {
       }
     });
 
-    app.get("/users/me", async (req, res) => {
+    app.get("/users/me", verifyFBToken, async (req, res) => {
       try {
         const { email } = req.query;
         const user = await usersCollection.findOne({ email });
@@ -140,7 +166,7 @@ async function run() {
 
     app.get("/users/role", verifyFBToken, async (req, res) => {
       try {
-        const { email } = req.query;
+        const email = req.decodedToken.email;
         const user = await usersCollection.findOne({ email });
         res.status(200).send({ role: user?.role || "Employee" });
       } catch (error) {
@@ -148,7 +174,7 @@ async function run() {
       }
     });
 
-    app.get("/users/employees", async (req, res) => {
+    app.get("/users/employees", verifyFBToken, verifyHR, async (req, res) => {
       try {
         const users = await usersCollection
           .find({
@@ -169,22 +195,27 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id/update-verification", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const user = await usersCollection.findOne(filter);
+    app.patch(
+      "/users/:id/update-verification",
+      verifyFBToken,
+      verifyHR,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const filter = { _id: new ObjectId(id) };
+          const user = await usersCollection.findOne(filter);
 
-        const updatedDoc = { $set: { isVerified: !user.isVerified } };
-        const updated = await usersCollection.updateOne(filter, updatedDoc);
+          const updatedDoc = { $set: { isVerified: !user.isVerified } };
+          const updated = await usersCollection.updateOne(filter, updatedDoc);
 
-        res.send(updated);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to update verified status" });
+          res.send(updated);
+        } catch (error) {
+          res.status(500).send({ error: "Failed to update verified status" });
+        }
       }
-    });
+    );
 
-    app.get("/users/:id/details", async (req, res) => {
+    app.get("/users/:id/details", verifyFBToken, verifyHR, async (req, res) => {
       try {
         const { id } = req.params;
 
@@ -212,6 +243,18 @@ async function run() {
       }
     });
 
+    app.get("/users", verifyFBToken, verifyHR, async (req, res) => {
+      try {
+        const { role } = req.query;
+        const filter = role ? { role } : {};
+        const users = await usersCollection.find(filter).toArray();
+        res.status(200).json(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).send({ error: "Failed to fetch users" });
+      }
+    });
+
     app.get("/users/verified", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
         const users = await usersCollection
@@ -234,35 +277,45 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id/fire", async (req, res) => {
-      try {
-        const { id } = req.params;
-        const filter = { _id: new ObjectId(id) };
-        const updateStatus = { $set: { status: "fired", role: "HR" } };
+    app.patch(
+      "/users/:id/make-hr",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const filter = { _id: new ObjectId(id) };
+          const updateRole = { $set: { role: "HR" } };
 
-        const updated = await usersCollection.updateOne(filter, updateStatus);
-
-        res.send(updated);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to fire the user" });
+          const updated = await usersCollection.updateOne(filter, updateRole);
+          res.send(updated);
+        } catch (error) {
+          res.status(500).send({ error: "Failed to update role" });
+        }
       }
-    });
+    );
 
-    app.patch("/users/:id/make-hr", async (req, res) => {
-      try {
-        const { id } = req.params;
-        const filter = { _id: new ObjectId(id) };
-        const updateRole = { $set: { role: "HR" } };
+    app.patch(
+      "/users/:id/fire",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const filter = { _id: new ObjectId(id) };
+          const updateStatus = { $set: { status: "fired", role: "HR" } };
 
-        const updated = await usersCollection.updateOne(filter, updateRole);
-        res.send(updated);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to update role" });
+          const updated = await usersCollection.updateOne(filter, updateStatus);
+
+          res.send(updated);
+        } catch (error) {
+          res.status(500).send({ error: "Failed to fire the user" });
+        }
       }
-    });
+    );
 
     /** ----------------------tasks api----------------------**/
-    app.post("/work-sheet", async (req, res) => {
+    app.post("/work-sheet", verifyFBToken, verifyEmployee, async (req, res) => {
       try {
         const task = req.body;
         task.hours = parseInt(task.hours);
@@ -273,47 +326,71 @@ async function run() {
       }
     });
 
-    app.get("/work-sheet", async (req, res) => {
+    app.get(
+      "/work-sheet/me",
+      verifyFBToken,
+      verifyEmployee,
+      async (req, res) => {
+        try {
+          const { email } = req.query;
+
+          const query = { created_by: email };
+          const task = await tasksCollection
+            .find(query)
+            .sort({ date: -1 })
+            .toArray();
+
+          res.status(200).send(task || []);
+        } catch (error) {
+          res.status(500).send({ error: "Failed to fetch tasks" });
+        }
+      }
+    );
+
+    app.put(
+      "/work-sheet/:id",
+      verifyFBToken,
+      verifyEmployee,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const updatedData = req.body;
+          updatedData.hours = parseInt(updatedData.hours);
+
+          const filter = { _id: new ObjectId(id) };
+          const updateDoc = { $set: updatedData };
+
+          const result = await tasksCollection.updateOne(filter, updateDoc);
+          res.send(result);
+        } catch (error) {
+          res.status(500).send({ error: "Failed to update task" });
+        }
+      }
+    );
+
+    app.delete(
+      "/work-sheet/:id",
+      verifyFBToken,
+      verifyEmployee,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const result = await tasksCollection.deleteOne({
+            _id: new ObjectId(id),
+          });
+          res.send(result);
+        } catch (error) {
+          res.status(500).send({ error: "Failed to delete task" });
+        }
+      }
+    );
+
+    app.get("/work-sheet", verifyFBToken, verifyHR, async (req, res) => {
       try {
-        const email = req.query.email;
-
-        const query = email ? { created_by: email } : {};
-        const task = await tasksCollection
-          .find(query)
-          .sort({ date: -1 })
-          .toArray();
-
-        res.status(200).send(task || {});
+        const task = await tasksCollection.find().sort({ date: -1 }).toArray();
+        res.status(200).send(task || []);
       } catch (error) {
         res.status(500).send({ error: "Failed to fetch tasks" });
-      }
-    });
-
-    app.put("/work-sheet/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const updatedData = req.body;
-        updatedData.hours = parseInt(updatedData.hours);
-
-        const filter = { _id: new ObjectId(id) };
-        const updateDoc = { $set: updatedData };
-
-        const result = await tasksCollection.updateOne(filter, updateDoc);
-        res.send(result);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to update task" });
-      }
-    });
-
-    app.delete("/work-sheet/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const result = await tasksCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        res.send(result);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to delete task" });
       }
     });
 
@@ -335,7 +412,7 @@ async function run() {
     });
 
     /** ----------------------payments api----------------------**/
-    app.post("/payment", async (req, res) => {
+    app.post("/payment", verifyFBToken, verifyHR, async (req, res) => {
       try {
         const paymentData = req.body;
         const { employeeId, month, year } = paymentData;
@@ -381,7 +458,7 @@ async function run() {
       }
     });
 
-    app.get("/payments", async (req, res) => {
+    app.get("/payments", verifyFBToken, verifyEmployee, async (req, res) => {
       try {
         const { email, page = 1, limit = 5 } = req.query;
 

@@ -34,6 +34,7 @@ async function run() {
     const usersCollection = database.collection("users");
     const tasksCollection = database.collection("work-sheet");
     const paymentsCollection = database.collection("payments");
+    const messagesCollection = database.collection("messages");
 
     // Middleware to verify Firebase ID Token
     const verifyFBToken = async (req, res, next) => {
@@ -626,6 +627,30 @@ async function run() {
         }
       }
     );
+
+    /** ----------------------messages api----------------------**/
+    app.post("/messages", async (req, res) => {
+      try {
+        const message = req.body;
+        const result = await messagesCollection.insertOne(message);
+        res.status(200).send(result);
+      } catch (err) {
+        res.status(500).send({ error: "Failed to submit message." });
+      }
+    });
+
+    app.get("/messages", verifyFBToken, verifyAdmin, async (req, res) => {
+      try {
+        const messages = await messagesCollection
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        res.send(messages);
+      } catch (err) {
+        res.status(500).send({ error: "Failed to load messages." });
+      }
+    });
 
     console.log("You successfully connected to MongoDB!");
   } finally {

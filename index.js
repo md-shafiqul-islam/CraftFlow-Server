@@ -524,54 +524,48 @@ async function run() {
       }
     });
 
-    app.get(
-      "/payments/pending",
-      verifyFBToken,
-      verifyAdmin,
-      async (req, res) => {
-        try {
-          const payments = await paymentsCollection
-            .aggregate([
-              {
-                $lookup: {
-                  from: "users",
-                  let: { employeeId: "$employeeId" },
-                  pipeline: [
-                    {
-                      $match: {
-                        $expr: {
-                          $and: [
-                            { $eq: ["$_id", { $toObjectId: "$$employeeId" }] },
-                            { $ne: ["$status", "fired"] },
-                          ],
-                        },
+    app.get("/payments/all", verifyFBToken, verifyAdmin, async (req, res) => {
+      try {
+        const payments = await paymentsCollection
+          .aggregate([
+            {
+              $lookup: {
+                from: "users",
+                let: { employeeId: "$employeeId" },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $and: [
+                          { $eq: ["$_id", { $toObjectId: "$$employeeId" }] },
+                          { $ne: ["$status", "fired"] },
+                        ],
                       },
                     },
-                  ],
-                  as: "user",
-                },
+                  },
+                ],
+                as: "user",
               },
-              {
-                $match: {
-                  paymentStatus: "pending",
-                  user: { $ne: [] },
-                },
+            },
+            {
+              $match: {
+                user: { $ne: [] },
               },
-              {
-                $sort: { year: -1, month: -1 },
-              },
-              {
-                $project: { user: 0 },
-              },
-            ])
-            .toArray();
+            },
+            {
+              $sort: { year: -1, month: -1 },
+            },
+            {
+              $project: { user: 0 },
+            },
+          ])
+          .toArray();
 
-          res.send(payments);
-        } catch (error) {
-          res.status(500).send({ message: "Failed to fetch pending payments" });
-        }
+        res.send(payments);
+      } catch (error) {
+        res.status(500).send({ message: "Failed to fetch payments" });
       }
-    );
+    });
 
     app.patch(
       "/payments/salary",
@@ -615,7 +609,7 @@ async function run() {
             { _id: new ObjectId(id) },
             {
               $set: {
-                status: "completed",
+                paymentStatus: "completed",
                 paymentDate,
               },
             }

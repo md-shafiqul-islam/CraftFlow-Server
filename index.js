@@ -14,7 +14,10 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-const serviceAccount = require("./service-account-credentials.json");
+const decodedKey = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
+const serviceAccount = JSON.parse(decodedKey);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
@@ -646,7 +649,7 @@ async function run() {
       }
     });
 
-    console.log("You successfully connected to MongoDB!");
+    // console.log("You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
   }

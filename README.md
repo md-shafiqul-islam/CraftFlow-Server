@@ -1,92 +1,198 @@
-# 🛠️ CraftFlow – Server Side
+# CraftFlow — Server
 
-Backend for **CraftFlow**, a role-based employee management system designed for interior design and renovation companies. 
-Manages authentication, user roles, task tracking, payroll processing, and secure API endpoints.
+Backend API for **CraftFlow**, a role-based employee management system designed to manage employees, tasks, payroll workflows, and role-based operations.
 
----
-
-## 📌 About
-
-Built with **Express.js** and **MongoDB**, this server handles secure user authentication with Firebase JWT, role-based access control, and data operations for tasks, users, payroll, and HR/admin functionality.
+The server provides secure API endpoints for authentication, authorization, employee management, task tracking, payroll processing, and administrative operations.
 
 ---
 
-## ⚙️ Setup & Run Locally
+## 🚀 Project Overview
 
-1. Clone the repository
+CraftFlow is a full-stack employee management platform with three primary roles:
 
-   ```bash
-   git clone https://github.com/md-shafiqul-islam/craftflow-server.git
-   cd craftflow-server
+- 👨‍💻 **Employee** — Manage daily tasks and track work activity
+- 🧑‍💼 **HR** — Verify employees, manage records, and process payroll requests
+- 👨‍💻 **Admin** — Manage users, roles, payroll approvals, and system operations
 
----
-
-## 🛠 Tech Stack
-
-- Node.js  
-- Express.js  
-- MongoDB
-- Firebase Admin SDK
-- JWT  
-- Stripe API (salary payments)
-- CORS & dotenv
+This repository contains the backend API that powers the CraftFlow application.
 
 ---
 
-## 🌐 Project Structure 
+## ✨ Key Features
 
-📦 server
- ┣ 📂 controllers
- ┣ 📂 middlewares
- ┣ 📂 models
- ┣ 📂 routes
- ┣ 📜 server.js
- ┣ 📜 .env.example
- ┗ 📜 package.json
+### 🔐 Authentication & Authorization
+
+- Firebase token verification
+- JWT-based authentication
+- Protected API endpoints
+- Secure authorization middleware
+
+### 🛡️ Role-Based Access Control
+
+Role-based permissions for:
+
+- Employee
+- HR
+- Admin
+
+Middleware ensures users can only access resources and operations permitted for their role.
+
+### 👥 User Management
+
+- Manage employee accounts
+- Verify employee profiles
+- Promote employees to HR roles
+- Restrict employee access through soft deletion
+
+### 📝 Task Management
+
+- Create employee work records
+- Update task information
+- Delete tasks
+- Retrieve employee work history
+- Support task filtering and management workflows
+
+### 💰 Payroll Management
+
+- Create salary and payment requests
+- Process payroll workflows
+- Prevent duplicate payment operations
+- Manage salary-related records
+
+### 💳 Stripe Payment Integration
+
+- Secure payment processing
+- Stripe payment workflow integration
+- Payment status management
+
+### 🌐 RESTful API
+
+- Structured API routes
+- CRUD operations
+- Protected endpoints
+- Middleware-based authorization
 
 ---
 
-## 📁 Repositories  
-**Server:** [github.com/md-shafiqul-islam/craftflow-server](https://github.com/md-shafiqul-islam/craftflow-server)
+## 🛠️ Tech Stack
+
+- **Node.js**
+- **Express.js**
+- **MongoDB**
+- **Firebase Admin SDK**
+- **JWT**
+- **Stripe**
+- **CORS**
+- **dotenv**
 
 ---
 
-## 🧪 Getting Started
+## 🌐 Live Project
 
-To run this project locally:
+👉 [Live](https://craft-flow.netlify.app/)
 
-# 1. Clone the repositories
-git clone https://github.com/md-shafiqul-islam/craftflow-server.git
+---
 
-# 2. Install dependencies for both
-cd ../craftflow-server
+## 🚀 Getting Started
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/md-shafiqul-islam/CraftFlow-Server
+```
+
+### 2. Navigate to the Project
+```bash
+cd CraftFlow-Server
+```
+
+### 3. Install Dependencies
+
+```bash
 npm install
+```
 
-# 3. Set up environment variables
-# For server: create `.env` inside `craftflow-server`
+### 4. Configure Environment Variables
+
+```env
 PORT=5000
-DB_URL=MONGODB_URI
-ACCESS_TOKEN_SECRET=FB_SERVICE_KEY
-STRIPE_SECRET_KEY=PAYMENT_GATEWAY_KEY
+DB_URL=your_mongodb_connection_string
+ACCESS_TOKEN_SECRET=your_jwt_secret
+FB_SERVICE_KEY=your_firebase_service_account_credentials
+STRIPE_SECRET_KEY=your_stripe_secret_key
+```
 
-# 4. Run server
-# In terminal:
-cd craftflow-server
+### 5. Run the Server
+
+```bash
 nodemon index.js
+```
 
 ---
 
-## 🔧 Key Features
+## 🔗 Related Repository
 
-- Firebase JWT-based authentication & authorization
-- Role-based middleware for Employee, HR, and Admin access
-- CRUD APIs for managing tasks, users, and payroll
-- Stripe API integration for secure salary payments
-- Soft delete (fire) employees to restrict access
+- Frontend: [CraftFlow Client](https://github.com/md-shafiqul-islam/CraftFlow-Client)
 
 ---
 
-## 📄 License  
-This project is open-source and available under the [MIT License](LICENSE).
+## 🧩 API Capabilities
+
+The backend supports APIs for:
+
+- Authentication and authorization
+- User management
+- Employee verification
+- Role management
+- Task management
+- Work records
+- Payroll requests
+- Salary processing
+- Payment workflows
+- Administrative operations
+
+---
+
+## 🔒 Security
+
+The application implements several security-focused practices:
+
+- Firebase token verification
+- JWT authentication
+- Protected API routes
+- Role-based authorization
+- Server-side access validation
+- Environment variable protection
+- CORS configuration
+
+---
+
+## 📌 Related Project
+
+CraftFlow is a full-stack employee management system designed to streamline workplace operations
+through dedicated dashboards and role-based workflows.
+
+Main Features:
+
+- Role-Based Access Control (Employee, HR, Admin)
+- Employee management
+- Task tracking
+- Employee verification
+- Payroll workflows
+- Secure authentication
+- Stripe payment integration
+- Dashboard analytics
+
+---
+
+### 👨‍💻 Author
+
+Md. Shafiqul Islam
+
+Software Engineer | Full-Stack Developer
+
+- [Porfolio](https://shafiqul-islam.netlify.app/)
+- [LinkedIn](https://www.linkedin.com/in/mdshafiqulislam1/)
+- [GitHub](https://github.com/md-shafiqul-islam)
 
 ---
